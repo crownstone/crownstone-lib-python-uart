@@ -1,6 +1,6 @@
 import asyncio
-import os
 import threading
+import logging
 
 import serial
 import serial.tools.list_ports
@@ -16,8 +16,9 @@ from crownstone_uart.core.uart.UartTypes import UartTxType
 from crownstone_uart.core.uart.UartWrapper import UartWrapper
 from crownstone_uart.topics.SystemTopics import SystemTopics
 
+_LOGGER = logging.getLogger(__name__)
 
-class UartBridge (threading.Thread):
+class UartBridge(threading.Thread):
 
     def __init__(self, port, baudrate):
         self.baudrate = baudrate
@@ -29,13 +30,11 @@ class UartBridge (threading.Thread):
         self.eventId = 0
 
         self.running = True
-        
-        threading.Thread.__init__(self)
 
+        threading.Thread.__init__(self)
 
     def __del__(self):
         self.stop_sync()
-
 
     async def handshake(self):
         collector = Collector(timeout=0.25, topic=UartTopics.uartMessage)
@@ -47,12 +46,10 @@ class UartBridge (threading.Thread):
                 return reply["string"] == "HelloCrownstone"
         return False
 
-
     def echo(self, string):
         controlPacket = ControlPacket(ControlType.UART_MESSAGE).loadString(string).getPacket()
-        uartPacket    = UartWrapper(UartTxType.CONTROL, controlPacket).getPacket()
+        uartPacket = UartWrapper(UartTxType.CONTROL, controlPacket).getPacket()
         self.write_to_uart(uartPacket)
-
 
     async def starting(self):
         counter = 0
@@ -66,13 +63,11 @@ class UartBridge (threading.Thread):
         self.start_serial()
         self.start_reading()
 
-
     def stop_sync(self):
         # print("Stopping UartBridge")
         self.running = False
         self.parser.stop()
         UartEventBus.unsubscribe(self.eventId)
-
 
     async def stop(self):
         self.stop_sync()
@@ -81,11 +76,9 @@ class UartBridge (threading.Thread):
             counter += 0.1
             await asyncio.sleep(0.1)
 
-
     async def isAlive(self):
         while self.serialController is not None and self.running:
             await asyncio.sleep(0.1)
-
 
     def start_serial(self):
         # print("Initializing serial on port ", self.port, ' with baudrate ', self.baudrate)
@@ -97,7 +90,6 @@ class UartBridge (threading.Thread):
             self.serialController.open()
         except OSError or serial.SerialException or KeyboardInterrupt:
             self.stop_sync()
-
 
     def start_reading(self):
         readBuffer = UartReadBuffer()
@@ -115,14 +107,16 @@ class UartBridge (threading.Thread):
 
             # print("Cleaning up UartBridge")
         except OSError or serial.SerialException:
-            print("Connection Failed. Retrying...")
+            _LOGGER.info("Connection to USB failed. Retrying now...")
         except KeyboardInterrupt:
             self.running = False
-            print("Closing serial connection.")
 
+        # close the serial controller
         self.started = False
         self.serialController.close()
         self.serialController = None
+        # remove the event listener pointing to the old connection
+        UartEventBus.unsubscribe(self.eventId)
 
     def write_to_uart(self, data):
         if self.serialController is not None and self.started:

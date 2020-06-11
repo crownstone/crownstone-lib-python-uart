@@ -1,11 +1,15 @@
 import asyncio
+import logging
 
 from crownstone_uart.core.uart.UartBridge import UartBridge
 from serial.tools import list_ports
 
+_LOGGER = logging.getLogger(__name__)
+
+
 class UartManager:
 
-    def __init__(self, loop = None):
+    def __init__(self, loop=None):
         self.port = None
         self.baudRate = 230400
         self.running = True
@@ -28,8 +32,7 @@ class UartManager:
         if self._uartBridge is not None:
             self._uartBridge.stop_sync()
 
-
-    async def initialize(self, port = None, baudrate = 230400):
+    async def initialize(self, port=None, baudrate=230400):
         self.baudRate = baudrate
         self.ready = False
 
@@ -47,23 +50,19 @@ class UartManager:
             else:
                 await self._attemptConnection(self._attemptingIndex, False)
 
-
         if self._trackingLoop is None:
             self._trackingLoop = asyncio.get_running_loop()
 
         if self.port is None:
-            if self._attemptingIndex >= len(self._availablePorts): # this also catches len(self._availablePorts) == 0
-                print("No Crownstone USB connected? Retrying...")
+            if self._attemptingIndex >= len(self._availablePorts):  # this also catches len(self._availablePorts) == 0
                 await asyncio.sleep(1)
                 await self.reset()
             else:
                 await self._attemptConnection(self._attemptingIndex)
 
-
     async def _attemptConnection(self, index, handshake=True):
         attemptingPort = self._availablePorts[index]
         await self.setupConnection(attemptingPort.device, handshake)
-
 
     async def setupConnection(self, port, handshake=True):
         self._uartBridge = UartBridge(port, self.baudRate)
@@ -75,23 +74,20 @@ class UartManager:
             success = await self._uartBridge.handshake()
 
         if not success:
-            print("Crownstone handshake failed. Moving on to next device...")
             self._attemptingIndex += 1
             self.ready = False
             await self._uartBridge.stop()
             await self.initialize()
         else:
-            print("Connection established to", port)
+            _LOGGER.info("Connection established to {}".format(port))
             self.port = port
             self.ready = True
             asyncio.ensure_future(self.trackConnection())
-        
 
     async def trackConnection(self):
         await self._uartBridge.isAlive()
         if self.running:
             asyncio.ensure_future(self.reset())
-
 
     def is_ready(self) -> bool:
         return self.ready

@@ -6,12 +6,15 @@ from crownstone_uart.core.modules.MeshHandler import MeshHandler
 from crownstone_uart.core.dataFlowManagers.StoneManager import StoneManager
 from crownstone_uart.core.modules.UsbDevHandler import UsbDevHandler
 import asyncio
+import logging
 
 from crownstone_uart.core.UartEventBus import UartEventBus
 from crownstone_uart.core.uart.UartManager import UartManager
 from crownstone_uart.core.uart.UartTypes import UartTxType
 from crownstone_uart.core.uart.UartWrapper import UartWrapper
 from crownstone_uart.topics.SystemTopics import SystemTopics
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class CrownstoneUart:
@@ -34,10 +37,10 @@ class CrownstoneUart:
     def is_ready(self) -> bool:
         return self.uartManager.is_ready()
 
-    async def initialize_usb(self, port = None, baudrate=230400):
+    async def initialize_usb(self, port=None, baudrate=230400):
         await self.uartManager.initialize(port, baudrate)
 
-    def initialize_usb_sync(self, port = None, baudrate=230400):
+    def initialize_usb_sync(self, port=None, baudrate=230400):
         try:
             self.loop.run_until_complete(self.uartManager.initialize(port, baudrate))
         except KeyboardInterrupt:
@@ -48,7 +51,8 @@ class CrownstoneUart:
             self.uartManager.stop()
         self.running = False
 
-    #
+        _LOGGER.info("Crownstone Uart has stopped.")
+
     def switch_crownstone(self, crownstoneId, on):
         """
         :param crownstoneId:
@@ -60,7 +64,6 @@ class CrownstoneUart:
         else:
             self.mesh.turn_crownstone_on(crownstoneId)
 
-
     def dim_crownstone(self, crownstoneId, value):
         """
         :param crownstoneId:
@@ -69,7 +72,6 @@ class CrownstoneUart:
         """
 
         self.mesh.set_crownstone_switch_state(crownstoneId, value)
-
 
     def get_crownstone_ids(self):
         return self.stoneManager.getIds()
